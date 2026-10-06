@@ -4,7 +4,8 @@
     that: reverse_proxy_cloudflare_dns_api_token | length > 0
     fail_msg: >-
       reverse_proxy_cloudflare_dns_api_token is empty. Put cloudflare_dns_api_token
-      in secrets.yaml — a Cloudflare token with Zone:DNS:Edit on that zone.
+      in nextcloud/secrets.yaml (mise run secrets:edit nextcloud) — a Cloudflare
+      token with Zone:DNS:Edit on that zone — and run through `mise run play`.
     quiet: true
 
 - name: Ensure Docker is running and enabled

@@ -19,7 +19,7 @@ nextcloud_aio_users: []
 nextcloud_aio_nas_personal_share: ""
 
 # NAS external storage (SMB). Disabled by default; set the real values in
-# group_vars and the credentials in the repo-root secrets.yaml.
+# group_vars and the credentials in nextcloud/secrets.yaml.
 nextcloud_aio_nas_enabled: false
 # Shared SMB connection defaults, applied to every mount unless an item
 # overrides them. user/password come from the environment.
