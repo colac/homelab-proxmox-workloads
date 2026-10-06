@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/colac/homelab-proxmox-workloads/compare/v1.0.0...v1.1.0) (2026-10-06)
+
+
+### Features
+
+* standalone workloads repo with per-app folders and secrets ([d2e3944](https://github.com/colac/homelab-proxmox-workloads/commit/d2e39440c665a56305ed0ccdd57ffdfbc9dbfe9e))
+
 # 1.0.0 (2026-10-06)
 
 
