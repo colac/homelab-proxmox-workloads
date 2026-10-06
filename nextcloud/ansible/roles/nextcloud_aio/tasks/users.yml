@@ -8,6 +8,9 @@
   register: nextcloud_aio_users_running
   changed_when: false
   failed_when: false
+  # Read-only, so it runs under --check too; skipped, it registers nothing
+  # and the tasks that parse its output fail.
+  check_mode: false
 
 - name: Note when Nextcloud is not running yet
   ansible.builtin.debug:
@@ -26,6 +29,7 @@
         php occ user:list --output=json
       register: nextcloud_aio_users_list
       changed_when: false
+      check_mode: false   # read-only; see above
 
     - name: Create each configured user
       ansible.builtin.command:

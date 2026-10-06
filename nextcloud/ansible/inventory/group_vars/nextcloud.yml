@@ -7,15 +7,16 @@
 # only: on the LAN directly, and off-LAN over Tailscale.
 #
 # Secrets and the public hostname come from the environment, not from this
-# file: the repo-root secrets.yaml is SOPS-encrypted, direnv decrypts it and
-# ansible/.envrc exports the variables read below. See secrets.yaml.example
-# for every key and what it is for.
+# file: nextcloud/secrets.yaml is SOPS-encrypted, and `mise run play nextcloud`
+# decrypts it through .mise/sops-exec for that one run, exporting the
+# variables read below. See nextcloud/secrets.yaml.example for every key.
 #
-# nextcloud_domain, acme_email and cloudflare_dns_api_token are defined in
-# group_vars/all.yml — the monitoring host needs them too (Kibana's
-# certificate uses the same zone and token), and group_vars for a group a host
-# is not in are invisible.
-reverse_proxy_acme_email: "{{ acme_email }}"
+# The Cloudflare token is this app's own. The monitoring repo's Kibana cert
+# uses a separate token from its own secrets.yaml, so rotating one never
+# breaks the other.
+nextcloud_domain: "{{ lookup('env', 'NEXTCLOUD_DOMAIN') }}"
+cloudflare_dns_api_token: "{{ lookup('env', 'CLOUDFLARE_DNS_API_TOKEN') }}"
+reverse_proxy_acme_email: "{{ lookup('env', 'ACME_EMAIL') }}"
 
 # ===========================================================================
 # Nextcloud AIO (All-in-One) — reverse-proxy mode behind Caddy
@@ -46,8 +47,8 @@ nextcloud_aio_extra_env: {}
 # Tailscale
 # ===========================================================================
 
-# Auth key to join the tailnet non-interactively, from secrets.yaml via
-# ansible/.envrc. Leave it empty there to skip `tailscale up` and authenticate
+# Auth key to join the tailnet non-interactively, from nextcloud/secrets.yaml
+# via .mise/sops-exec. Leave it empty there to skip `tailscale up` and authenticate
 # by hand later, then re-run this playbook.
 tailscale_authkey: "{{ lookup('env', 'TAILSCALE_AUTHKEY') }}"
 
@@ -66,7 +67,7 @@ tailscale_up_extra_args: "--ssh"
 # TrueNAS — SMB external storage
 # ===========================================================================
 # Runs after AIO first-run setup (the Nextcloud container must be up). The SMB
-# credentials come from the environment (secrets.yaml -> ansible/.envrc),
+# credentials come from the environment (nextcloud/secrets.yaml -> sops-exec),
 # never from this tracked file.
 nextcloud_aio_nas_enabled: true
 # Shared SMB connection defaults, applied to every mount below.
@@ -105,12 +106,12 @@ nextcloud_aio_nas_mounts:
 # ===========================================================================
 # Nextcloud users (beyond the AIO admin account)
 # ===========================================================================
-# Usernames and passwords travel together in secrets.yaml as
+# Usernames and passwords travel together in nextcloud/secrets.yaml as
 # nextcloud_users_json, so neither is in the tracked repo. It is a single-line
 # JSON array rather than nested YAML because `sops -d --output-type dotenv`
 # emits flat key=value pairs only — the structure is restored here.
 #
 # Each entry: name (required), password (required), display_name (optional),
 # nas_folder (optional; true also attaches a private folder from
-# nextcloud_aio_nas_personal_share above). See secrets.yaml.example.
+# nextcloud_aio_nas_personal_share above). See nextcloud/secrets.yaml.example.
 nextcloud_aio_users: "{{ lookup('env', 'NEXTCLOUD_USERS_JSON') | default('[]', true) | from_json }}"

@@ -11,6 +11,9 @@
     php occ files_external:list --output=json
   register: nextcloud_aio_nas_list
   changed_when: false
+  # Read-only, so it runs under --check too; skipped, it registers nothing
+  # and the tasks that parse its output fail.
+  check_mode: false
 
 - name: Create and configure NAS mount {{ nextcloud_aio_nas_mount.name }}
   when: >-
@@ -92,6 +95,7 @@
     php occ files_external:list --output=json
   register: nextcloud_aio_nas_current
   changed_when: false
+  check_mode: false   # read-only; see "List existing external storage mounts"
 
 - name: Set change detection on NAS mount {{ nextcloud_aio_nas_mount.name }}
   ansible.builtin.command: >-

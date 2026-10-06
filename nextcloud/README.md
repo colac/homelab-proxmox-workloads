@@ -6,11 +6,14 @@ Let's Encrypt cert, no public exposure), with a TrueNAS box attached as
 external storage over SMB.
 
 ```text
-Packer    → builds template "ubuntu-24.04-template" (Docker + Tailscale baked in)
-Terraform → clones the template into the "nextcloud" VM, outputs its IP
-Ansible   → deploys Nextcloud AIO + a Caddy reverse proxy (TLS) + a Tailscale
-            subnet route + attaches TrueNAS as external storage
+Packer    → core repo: template "ubuntu-24.04-template" (Docker + Tailscale baked in)
+Terraform → this repo, nextcloud/terraform: clones it into the "nextcloud" VM
+Ansible   → this repo, nextcloud/ansible: Nextcloud AIO + a Caddy reverse proxy
+            (TLS) + a Tailscale subnet route + TrueNAS as external storage
+Agent     → monitoring repo: enrolls this VM with Fleet (it is an agent target there)
 ```
+
+Commands below run from the workloads repo root unless they say otherwise.
 
 ## How `nextcloud.example.com` stays private but works everywhere
 
@@ -28,33 +31,35 @@ The cert is valid on either path because it matches the hostname, not an IP.
 
 ## Files you create
 
-Two, not five. Everything credential-shaped goes into the repo-root
-`secrets.yaml`, which is SOPS-encrypted (ciphertext on disk, safe to commit) and
-reaches Packer, Terraform and Ansible as environment variables via direnv — so
-there is no `.tfvars`, no `.pkrvars.hcl` and no Ansible vault to maintain. See
-[Secrets](README.md#secrets).
+Three. Credentials are split by who consumes them, each file SOPS-encrypted
+(ciphertext on disk, safe to commit) and decrypted by `.mise/sops-exec` for one
+command at a time — never into your shell. There is no `.tfvars`, no
+`.pkrvars.hcl` and no Ansible vault. See [Secrets](../README.md#secrets).
 
 | Create this | How | Holds |
 |---|---|---|
-| `secrets.yaml` | `sops secrets.yaml` (keys documented in `secrets.yaml.example`) | Proxmox tokens, `packer_password_hash`, domain, ACME email, TrueNAS SMB user + password, the Nextcloud user list (names **and** passwords), Cloudflare token, Tailscale key |
-| `ansible/inventory/hosts.yml` | copy `.example` | the VM's IP (from Terraform output) — git-ignored |
+| `secrets.yaml` (repo root) | `mise run secrets:edit` (keys in `secrets.yaml.example`) | Proxmox endpoint, the Terraform Proxmox token, TFC token — Terraform only |
+| `nextcloud/secrets.yaml` | `mise run secrets:edit nextcloud` (keys in `nextcloud/secrets.yaml.example`) | domain, ACME email, Cloudflare token, TrueNAS SMB user + password, the Nextcloud user list (names **and** passwords), Tailscale key — Ansible only |
+| `nextcloud/ansible/inventory/hosts.yml` | copy `.example` | the VM's IP (from Terraform output) — git-ignored |
+
+The template (and the Packer token and console password hash that build it)
+is the core repo's; see its [packer/README.md](https://github.com/colac/homelab-proxmox/blob/main/packer/README.md).
 
 You also need an age key at `~/.config/sops/age/keys.txt` whose public half is a
-recipient in `.sops.yaml`; without it nothing decrypts.
+recipient in `.sops.yaml`; without it nothing decrypts. `mise run
+secrets:check` tells you which keys are missing without printing any value.
 
 ## Keys & passwords you need
 
 | Secret | How to get it | Goes in |
 |---|---|---|
 | age keypair | `age-keygen -o ~/.config/sops/age/keys.txt` | decrypts `secrets.yaml`; public half goes in `.sops.yaml` |
-| Packer Proxmox token (`packer@pve`) | `pveum` commands in [packer/README.md](packer/README.md) | `secrets.yaml` → `proxmox_packer_token_*` |
-| Terraform Proxmox token (`terraform@pve`) | `pveum` commands in [terraform/README.md](terraform/README.md) | `secrets.yaml` → `proxmox_terraform_token_*` |
-| SSH deploy keypair | generated below (`~/.ssh/homelab-proxmox`) | stays in `~/.ssh`; Packer reads the public half at direnv load |
-| Template console password hash | `mkpasswd -m sha-512 'pass'` (`whois` package) | `secrets.yaml` → `packer_password_hash` |
-| TrueNAS SMB user + password | create in the TrueNAS UI (see prerequisites) | `secrets.yaml` (the NAS *host* goes in `group_vars`) |
-| Nextcloud user names + passwords | you choose them | `secrets.yaml` → `nextcloud_users_json` |
-| Cloudflare API token | Cloudflare dashboard → My Profile → API Tokens (Zone:DNS:Edit on the `example.com` zone) | `secrets.yaml` |
-| Tailscale auth key (optional) | Tailscale admin → Settings → Keys | `secrets.yaml` |
+| Terraform Proxmox token (`terraform@pve`) | `pveum` commands in core's [terraform/README.md](https://github.com/colac/homelab-proxmox/blob/main/terraform/README.md) | `secrets.yaml` → `proxmox_terraform_token_*` |
+| SSH deploy keypair | generated below (`~/.ssh/homelab-proxmox`) | stays in `~/.ssh`; core's Packer reads the public half per build |
+| TrueNAS SMB user + password | create in the TrueNAS UI (see prerequisites) | `nextcloud/secrets.yaml` (the NAS *host* goes in `group_vars`) |
+| Nextcloud user names + passwords | you choose them | `nextcloud/secrets.yaml` → `nextcloud_users_json` |
+| Cloudflare API token | Cloudflare dashboard → My Profile → API Tokens (Zone:DNS:Edit on the `example.com` zone) — this app's own; Kibana's is separate | `nextcloud/secrets.yaml` |
+| Tailscale auth key (optional) | Tailscale admin → Settings → Keys | `nextcloud/secrets.yaml` |
 | Terraform Cloud token | `terraform login` | `~/.terraform.d/`, or `secrets.yaml` → `tf_cloud_token` |
 | AIO passphrase | auto-generated at first run | shown in AIO UI — save it |
 | Nextcloud admin password | you set during AIO setup | Nextcloud login |
@@ -70,21 +75,21 @@ ssh-keygen -t ed25519 -N "" -C "homelab-proxmox-nextcloud-deploy" \
   -f ~/.ssh/homelab-proxmox
 ```
 
-The example files and `ansible/ansible.cfg` already point at this path
+The example files and `nextcloud/ansible/ansible.cfg` already point at this path
 (`~/.ssh/homelab-proxmox` / `.pub`), so no edits are needed if you keep the name.
 
 ## 0. One-time prerequisites
 
 These cannot come from this repo — do them once:
 
-- **Dev tools:** `make all` (installs Terraform 1.15.7, the Python venv with
-  Ansible, and Node tools) and `./install-packer.sh`. Then install the Ansible
-  collections: `cd ansible && ansible-galaxy collection install -r requirements.yml`.
-- **Proxmox users/tokens:** create the `packer@pve` and `terraform@pve` roles,
-  users, and API tokens (commands in [README.md](README.md) and
-  [terraform/README.md](terraform/README.md)).
-- **Ubuntu ISO:** upload `ubuntu-24.04.x-live-server-amd64.iso` to a Proxmox
-  storage (referenced by `boot_iso_file`).
+- **Dev tools:** `mise trust && mise install && mise run setup` — pinned
+  Terraform, Python venv with Ansible, Node tools, git hooks, and each app's
+  Ansible collections (including `colac.homelab` from the core repo).
+- **Proxmox users/tokens:** the `terraform@pve` role, user and API token
+  (commands in core's [terraform/README.md](https://github.com/colac/homelab-proxmox/blob/main/terraform/README.md)).
+- **The template:** built by the core repo
+  (`cd ../homelab-proxmox && mise run packer:build 24.04`) — its
+  `vm_name` is what `template_name` here clones.
 - **Terraform Cloud:** run `terraform login`. The `Nextcloud` workspace already
   exists in the `colac_homelab` org — set it to **Local** execution mode
   (Workspace → Settings → Execution Mode) so it runs against Proxmox from your
@@ -94,38 +99,32 @@ These cannot come from this repo — do them once:
   VM joins — see step 4.)
 - **Cloudflare:** the `example.com` zone is on Cloudflare. Create a scoped API
   token (**Zone → DNS → Edit**, limited to this zone) for the ACME DNS-01
-  challenge; it goes in `secrets.yaml` as `cloudflare_dns_api_token`.
+  challenge; it goes in `nextcloud/secrets.yaml` as `cloudflare_dns_api_token`.
 - **PiHole:** add a local DNS A record `nextcloud.example.com → <VM LAN IP>`
   (Local DNS → DNS Records). This is what makes the name resolve on the LAN.
 - **TrueNAS:** Sharing → SMB → enable the service and create the share(s);
   Credentials → Users → create a dedicated SMB user (not `root`/`admin`) with
-  read/write access to it. See [TrueNAS/README.md](TrueNAS/README.md).
+  read/write access to it. See core's [TrueNAS/README.md](https://github.com/colac/homelab-proxmox/blob/main/TrueNAS/README.md).
 
-## 1. Build the base template (Packer)
+## 1. The base template (core repo)
+
+Built once, by the core repo, and shared with every VM in the homelab:
 
 ```bash
-cd packer/ubuntu-24.04    # direnv exports PKR_VAR_* on the way in
-packer init .
-packer validate .
-packer build .
+cd ../homelab-proxmox
+mise run packer:build 24.04
 ```
 
 Produces the `ubuntu-24.04-template` template with Docker and Tailscale
-pre-installed (Tailscale is installed but not yet authenticated).
-
-> Password login is disabled in the image. `packer/.envrc` sets
-> `ssh_authorized_keys` by reading `~/.ssh/homelab-proxmox.pub` at load time, so
-> it always matches `ssh_private_key_file`. If that file is missing, direnv says
-> so at `cd` time — otherwise the build would succeed and produce a template
-> nobody can log in to.
+pre-installed (Tailscale is installed but not yet authenticated). Password
+login is disabled in the image; the deploy key's public half is baked in.
 
 ## 2. Create the VM (Terraform)
 
 ```bash
-cd ../../terraform/projects/nextcloud   # direnv exports TF_VAR_pm_api_* here
-terraform init
-terraform apply
-terraform output ansible_inventory_line
+mise run tf nextcloud init
+mise run tf nextcloud apply
+mise run tf nextcloud output ansible_inventory_line
 ```
 
 The defaults in `variables.tf` are sized for Nextcloud (4 vCPU / 8 GB / 64 GB)
@@ -134,16 +133,15 @@ and state lives in the Terraform Cloud `Nextcloud` workspace. Copy the `ansible_
 ## 3. Configure the host (Ansible)
 
 ```bash
-# From the repo root, first put the values in place:
-sops secrets.yaml     # set: nextcloud_domain, reverse_proxy_acme_email,
+mise run secrets:edit nextcloud   # set: nextcloud_domain, acme_email,
 #   nextcloud_nas_user + nextcloud_nas_password, nextcloud_users_json,
 #   cloudflare_dns_api_token, tailscale_authkey
+mise run secrets:check
 
-cd ansible            # direnv exports them and puts .venv/bin on PATH
-cp inventory/hosts.yml.example inventory/hosts.yml   # paste the VM IP
-# edit inventory/group_vars/nextcloud.yml: nextcloud_aio_nas_host,
-#   nextcloud_aio_nas_mounts, nextcloud_aio_nas_personal_share
-ansible-playbook playbooks/10-nextcloud.yml
+cp nextcloud/ansible/inventory/hosts.yml.example nextcloud/ansible/inventory/hosts.yml
+# paste the VM IP; edit nextcloud/ansible/inventory/group_vars/nextcloud.yml:
+#   nextcloud_aio_nas_host, nextcloud_aio_nas_mounts, nextcloud_aio_nas_personal_share
+mise run play nextcloud playbooks/site.yml
 ```
 
 This deploys the AIO stack, builds the Caddy reverse proxy, and (if you supplied
@@ -167,7 +165,7 @@ ssh -L 8080:localhost:8080 ubuntu@<vm-ip>
 #   set domain to nextcloud.example.com → start containers → set admin pw
 
 # Second pass: now that the container is up, create the users and NAS mounts
-ansible-playbook playbooks/10-nextcloud.yml
+mise run play nextcloud playbooks/10-nextcloud.yml
 ```
 
 Then reach Nextcloud at `https://nextcloud.example.com` — on the LAN directly,
@@ -186,7 +184,7 @@ What pass 2 configures (details and syntax in
 
 | Nextcloud folder | TrueNAS path | Who | Access | Declared in |
 |---|---|---|---|---|
-| `<username>` | `media/<username>` | that user only | read-write | `secrets.yaml` → `nextcloud_users_json` |
+| `<username>` | `media/<username>` | that user only | read-write | `nextcloud/secrets.yaml` → `nextcloud_users_json` |
 | `Familia` | `media/Familia` | all users | **read-only** | `group_vars/nextcloud.yml` |
 
 Every person gets a private folder of their own, derived from their entry in
@@ -251,8 +249,8 @@ Three caveats worth knowing:
 
    Do **not** give it its own SMB share. Mounts connect to the `media` share
    and traverse into the subfolder/dataset, so a per-user share is unused.
-2. **In `secrets.yaml`**: `sops secrets.yaml` from the repo root and append an
-   object to the `nextcloud_users_json` array:
+2. **In `nextcloud/secrets.yaml`**: `mise run secrets:edit nextcloud` and
+   append an object to the `nextcloud_users_json` array:
 
    ```json
    {"name": "maria", "display_name": "Maria", "password": "…", "nas_folder": true}
@@ -268,7 +266,7 @@ Three caveats worth knowing:
    mounts, so removing an existing person's entry stops their folder from
    being recreated.
 
-3. **Apply**: `cd ansible && ansible-playbook playbooks/10-nextcloud.yml`. It
+3. **Apply**: `mise run play nextcloud playbooks/10-nextcloud.yml`. It
    creates the account and mounts `/maria` scoped to her alone; existing users
    and mounts are skipped. If a folder mount already exists but is unscoped
    (Applicable Users: `All`), delete it first — see the create-only gotcha
@@ -284,9 +282,10 @@ Three caveats worth knowing:
 
 ## Gotchas for this setup
 
-- **Building behind ProtonVPN:** set `PACKER_HTTP_INTERFACE` to your LAN NIC in
-  `.envrc.local` (git-ignored) so Packer advertises your LAN IP, not the VPN
-  tunnel, to the VM during autoinstall. Confirm the NIC with `ip -br addr`.
+- **Building the template behind ProtonVPN** (core repo): set
+  `PACKER_HTTP_INTERFACE` to your LAN NIC in core's `mise.local.toml`
+  (git-ignored) so Packer advertises your LAN IP, not the VPN tunnel, to the VM
+  during autoinstall. Confirm the NIC with `ip -br addr`.
 - **DNS:** the configs use `https://pve.example.com:8006/api2/json`, which only
   resolves through PiHole — keep PiHole as your DNS while deploying. TLS
   verification is on and the Let's Encrypt cert is valid, so it works by name.
@@ -321,13 +320,13 @@ Two images, updated two different ways.
 
 **Caddy is pinned in the repo.** `reverse_proxy_caddy_version` and
 `reverse_proxy_caddy_dns_cloudflare_version` in
-`ansible/roles/reverse_proxy/defaults/main.yml` (tags:
+`nextcloud/ansible/roles/reverse_proxy/defaults/main.yml` (tags:
 [caddy](https://hub.docker.com/_/caddy),
 [caddy-dns/cloudflare](https://github.com/caddy-dns/cloudflare/tags)). Bump
 them, then:
 
 ```bash
-ansible-playbook playbooks/10-nextcloud.yml --limit nextcloud-vm
+mise run play nextcloud playbooks/10-nextcloud.yml
 # on the VM: the rebuild recreates Caddy, a few seconds without HTTPS
 docker exec nextcloud-caddy caddy version
 docker exec nextcloud-caddy caddy list-modules | grep cloudflare
@@ -359,7 +358,7 @@ interface makes this unattended.
 > live on TrueNAS and are merely referenced by Nextcloud — so `Familia`'s
 > safety depends entirely on TrueNAS-side protection: Periodic Snapshot Tasks
 > on `hdd-home-1/media` plus a real 3-2-1 off-box copy (both are Tier 2 in
-> [TrueNAS/README.md](TrueNAS/README.md)). For critical data that matters more
+> core's [TrueNAS/README.md](https://github.com/colac/homelab-proxmox/blob/main/TrueNAS/README.md)). For critical data that matters more
 > than the Nextcloud backup below.
 
 ### TrueNAS config export
@@ -397,53 +396,50 @@ Assumes the **TrueNAS box and pool survive** — this restores Nextcloud, not th
 family photos. Rebuilding TrueNAS itself is a separate procedure (reinstall,
 then Manage Configuration → Upload File) and is not part of this pipeline.
 
-1. Run steps 1–3 above unchanged: Packer template (only if it's gone),
-   `terraform apply`, first Ansible pass.
+1. Run steps 1–3 above unchanged: the core template (only if it's gone),
+   `mise run tf nextcloud apply`, first Ansible pass.
 2. Complete the AIO first-run setup and set the admin password — the domain
    must be typed identically to the original.
 3. Mount the backup export and use AIO's **Restore** flow with the saved Borg
    passphrase to bring back the database and app data.
-4. Re-run `cd ansible && ansible-playbook playbooks/10-nextcloud.yml` to
+4. Re-run `mise run play nextcloud playbooks/10-nextcloud.yml` to
    recreate users and reattach the TrueNAS mounts. Both tasks are idempotent,
    so it's harmless if the restore already recreated them.
 5. Caddy, Tailscale, PiHole, and Cloudflare need nothing new — the cert is
    re-issued automatically via DNS-01, and the PiHole record only changes if
-   the VM's IP did.
+   the VM's IP did. If it did, also update the monitoring repo's
+   `ansible/inventory/hosts.yml` and re-enroll the agent there
+   (`mise run play playbooks/20-elastic-certs.yml playbooks/50-elastic-agent.yml --limit nextcloud-vm`).
 
 ## Troubleshooting
 
 ### Rotating the Cloudflare API token (or a cert failed to renew)
 
-One token, `cloudflare_dns_api_token` in `secrets.yaml`, serves **both** certs:
-Caddy on the Nextcloud VM and certbot on the monitoring VM (Kibana). Rotate it
-in one pass. The token needs `Zone:DNS:Edit` on the zone of `nextcloud_domain`.
+`cloudflare_dns_api_token` in `nextcloud/secrets.yaml` is **Caddy's own**.
+Kibana's certificate uses a separate token in the monitoring repo, so rotating
+this one never touches it (its steps are in that repo's
+[RUNBOOK.md](https://github.com/colac/homelab-proxmox-monitoring/blob/main/RUNBOOK.md#rotating-the-cloudflare-api-token)).
+The token needs `Zone:DNS:Edit` on the zone of `nextcloud_domain`.
 
 ```bash
 # 1. Cloudflare dashboard → My Profile → API Tokens → create/roll the token.
 # 2. Put it in place (values are edited via sops, never with a text editor):
-sops secrets.yaml            # set cloudflare_dns_api_token
-direnv reload                # or cd out and back in; verify with: env | grep -c CLOUDFLARE_DNS_API_TOKEN
+mise run secrets:edit nextcloud   # set cloudflare_dns_api_token
+mise run secrets:check            # confirms it is set, without printing it
 
-# 3. Push it to both hosts (from ansible/, venv active)
-ansible-playbook playbooks/10-nextcloud.yml --limit nextcloud-vm   # rewrites Caddy's .env, restarts Caddy
-ansible-playbook playbooks/35-kibana.yml    --limit monitoring-vm  # rewrites /etc/letsencrypt/cloudflare.ini, renews if due
+# 3. Push it to the host — rewrites Caddy's .env and restarts Caddy
+mise run play nextcloud playbooks/10-nextcloud.yml
 ```
 
-Then confirm each cert actually renews rather than assuming:
-
-- **Caddy:** `docker logs nextcloud-caddy 2>&1 | tail -50` on the Nextcloud VM.
-  Caddy retries ACME on restart, so a new token normally issues within a minute
-  or two. Look for `certificate obtained successfully`.
-- **Kibana:** on the monitoring VM, `sudo certbot renew --dry-run` proves the
-  new credentials work. The playbook only renews when the cert is inside
-  certbot's 30-day window; if it is not yet due but you want the new token
-  exercised for real, `sudo certbot renew --force-renewal` (the deploy-hook
-  copies the pair in and restarts Kibana). Check the result with
-  `sudo certbot certificates`.
+Then confirm the cert actually renews rather than assuming:
+`docker logs nextcloud-caddy 2>&1 | tail -50` on the Nextcloud VM. Caddy
+retries ACME on restart, so a new token normally issues within a minute or
+two. Look for `certificate obtained successfully`.
 
 If it still fails, the usual causes are a token scoped to the wrong zone, a
-token with `Zone:Read` but no `DNS:Edit`, or the env var not reaching Ansible
-(the `common` role's assert fails the run in that case). Expiry dates of the
+token with `Zone:Read` but no `DNS:Edit`, or the playbook run outside
+`mise run play` (the `reverse_proxy` role's assert fails the run in that
+case). Expiry dates of the
 old cert are your deadline: Let's Encrypt certs last 90 days and both tools
 start renewing at 30 days remaining.
 
@@ -474,10 +470,11 @@ present in the app, ensure it's on.
 
 | Item | Provided by repo | You supply |
 |---|---|---|
-| Packer template + scripts | yes | ISO |
-| Terraform config + module | yes | TFC login |
-| Ansible roles + playbook | yes | `inventory/hosts.yml` |
-| Secrets scheme (SOPS + direnv) | yes | age key, values in `secrets.yaml` |
+| Packer template + scripts | core repo | ISO |
+| Terraform config (+ core's module) | yes | TFC login |
+| Ansible roles + playbook (+ core's collection) | yes | `nextcloud/ansible/inventory/hosts.yml` |
+| Secrets scheme (SOPS + mise) | yes | age key, values in `secrets.yaml` and `nextcloud/secrets.yaml` |
+| Elastic Agent enrollment | monitoring repo | the VM listed in its `inventory/hosts.yml` |
 | SSH deploy key | command above | run it once |
 | Proxmox users / API tokens | docs only | create per README |
 | Caddy reverse proxy + Tailscale roles | yes | Cloudflare token, route approval, split-DNS |

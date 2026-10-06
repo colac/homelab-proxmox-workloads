@@ -1,14 +1,18 @@
 # k3s VM (Terraform project)
 
-Clones the Packer-built template into a VM. State is stored in the Terraform
-Cloud `k3s` workspace of the `colac_homelab` organization.
+Clones the core repo's template into a VM, using the core repo's `base-vm`
+module pinned to a release tag. State is stored in the Terraform Cloud `k3s`
+workspace of the `colac_homelab` organization (Local execution). Nothing
+configures the VM yet — see [../README.md](../README.md).
 
 ```bash
-cp terraform.tfvars.example terraform.tfvars   # then fill in secrets
-terraform init
-terraform apply
+mise run tf k3s init
+mise run tf k3s plan
+mise run tf k3s apply
 ```
 
+<!-- The generated table shows the git:: module source as a bare URL. -->
+<!-- markdownlint-disable MD034 -->
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -25,7 +29,7 @@ No providers.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_base-vm"></a> [base-vm](#module\_base-vm) | ../../modules/base-vm | n/a |
+| <a name="module_base-vm"></a> [base-vm](#module\_base-vm) | git::https://github.com/colac/homelab-proxmox.git//terraform/modules/base-vm | v2.0.0 |
 
 ## Resources
 
@@ -43,7 +47,7 @@ No resources.
 | <a name="input_pm_api_token_id"></a> [pm\_api\_token\_id](#input\_pm\_api\_token\_id) | This is an API token you have previously created for a specific user. | `string` | n/a | yes |
 | <a name="input_pm_api_token_secret"></a> [pm\_api\_token\_secret](#input\_pm\_api\_token\_secret) | This uuid is only available when the token was initially created. | `string` | n/a | yes |
 | <a name="input_pm_api_url"></a> [pm\_api\_url](#input\_pm\_api\_url) | This is the target Proxmox API endpoint. | `string` | n/a | yes |
-| <a name="input_pm_tls_insecure"></a> [pm\_tls\_insecure](#input\_pm\_tls\_insecure) | Skip TLS verification against the Proxmox API. Set via TF\_VAR\_pm\_tls\_insecure from terraform/.envrc (PROXMOX\_TLS\_INSECURE); true is only needed when the endpoint serves a self-signed certificate. | `bool` | `false` | no |
+| <a name="input_pm_tls_insecure"></a> [pm\_tls\_insecure](#input\_pm\_tls\_insecure) | Skip TLS verification against the Proxmox API. Set via TF\_VAR\_pm\_tls\_insecure by .mise/sops-exec (PROXMOX\_TLS\_INSECURE in mise.toml); true is only needed when the endpoint serves a self-signed certificate. | `bool` | `false` | no |
 | <a name="input_proxmox_node"></a> [proxmox\_node](#input\_proxmox\_node) | n/a | `string` | `"pve"` | no |
 | <a name="input_proxmox_pool"></a> [proxmox\_pool](#input\_proxmox\_pool) | n/a | `string` | `null` | no |
 | <a name="input_proxmox_storage"></a> [proxmox\_storage](#input\_proxmox\_storage) | n/a | `string` | `"local-lvm"` | no |

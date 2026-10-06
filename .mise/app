@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# app — run a tool inside one app's directory, with that app's credentials.
+#
+#   .mise/app tf <app> [terraform args...]          # <app>/terraform, infra secrets
+#   .mise/app play <app> [ansible-playbook args...] # <app>/ansible, the app's secrets
+#   .mise/app inventory <app>                       # <app>/ansible, no secrets
+#   .mise/app ping <app>                            # <app>/ansible, no secrets
+#   .mise/app lint <app>                            # <app>/ansible, no secrets
+#
+# The mise tasks of the same names call this, appending your arguments with
+# their quoting intact. An app is any top-level directory with a terraform/ or
+# ansible/ inside; adding one needs no change here — only a sops-exec profile
+# named after it when it gains secrets.
+set -euo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+mode=${1:?usage: app <tf|play|inventory|ping|lint> <app> [args...]}
+app=${2:-}
+shift 2 || shift $#
+
+case $mode in
+  tf) sub=terraform ;;
+  play | inventory | ping | lint) sub=ansible ;;
+  *)
+    echo "app: unknown mode '$mode'" >&2
+    exit 2
+    ;;
+esac
+
+if [[ -z $app || ! -d $root/$app/$sub ]]; then
+  apps=$(cd "$root" && for d in */"$sub"/; do printf '%s ' "${d%%/*}"; done)
+  echo "app: '${app}' has no $sub/ — apps with one: ${apps:-none}" >&2
+  case $mode in
+    tf) example='plan' ;;
+    play) example='playbooks/site.yml --check --diff' ;;
+    *) example='' ;;
+  esac
+  echo "usage: mise run $mode <app> [args...]   e.g. mise run $mode nextcloud $example" >&2
+  exit 2
+fi
+cd "$root/$app/$sub"
+# Ad-hoc ansible commands in the app pick up its ansible.cfg, collections and roles.
+export ANSIBLE_CONFIG=$PWD/ansible.cfg
+
+case $mode in
+  tf) exec "$root/.mise/sops-exec" terraform terraform "$@" ;;
+  play) exec "$root/.mise/sops-exec" "$app" ansible-playbook "$@" ;;
+  inventory) exec ansible-inventory --graph "$@" ;;
+  ping) exec ansible all -m ping "$@" ;;
+  lint) ansible-lint "$@" && exec ansible-playbook playbooks/site.yml --syntax-check ;;
+esac

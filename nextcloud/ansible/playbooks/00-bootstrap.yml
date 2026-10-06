@@ -1,14 +1,17 @@
 ---
-- name: Preflight checks
-  hosts: all
+# Host preparation for the Nextcloud VM. Scoped to the `nextcloud` group:
+# this app's inventory holds nothing else, and being explicit means a host
+# added to hosts.yml for another reason is never prepared by accident.
+- name: Preflight
+  hosts: nextcloud
   become: true
   gather_facts: true
   roles:
-    # Verifies the Packer template baked in what Elasticsearch needs.
-    - common
-    # Moves /var/lib/docker onto the Terraform-attached data disk, under LVM.
-    # Runs here, before any play that starts a container, because migrating
-    # Docker's state means stopping Docker — cheap on a fresh host, disruptive
-    # once Nextcloud or Elasticsearch is running. Hosts with no data disk
-    # attached skip it and keep /var/lib/docker on the OS disk.
-    - docker_data
+    # Shared with every layer; installed from the core repo at the tag pinned
+    # in requirements.yml. Asserts only: address, Ubuntu, Docker.
+    - colac.homelab.common
+    # Moves /var/lib/docker (and containerd's images) onto the
+    # Terraform-attached data disk, under LVM. The Nextcloud VM has no data
+    # disk (data_disk_size is unset in nextcloud/terraform), so this skips —
+    # it is here so attaching one later needs no playbook change.
+    - colac.homelab.docker_data

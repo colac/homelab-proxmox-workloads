@@ -1,20 +1,27 @@
 # Nextcloud VM (Terraform project)
 
-Clones the Packer-built `ubuntu-24.04-template` into a VM sized for Nextcloud.
-State is stored in the Terraform Cloud `Nextcloud` workspace of the
-`colac_homelab` organization.
+Clones the core repo's `ubuntu-24.04-template` into a VM sized for Nextcloud,
+using the core repo's `base-vm` module pinned to a release tag. State is
+stored in the Terraform Cloud `Nextcloud` workspace of the `colac_homelab`
+organization (Local execution).
 
 ```bash
-cp terraform.tfvars.example terraform.tfvars   # then fill in secrets
-terraform init
-terraform apply
-terraform output ansible_inventory_line        # feed into ansible/inventory
+mise run tf nextcloud init
+mise run tf nextcloud plan
+mise run tf nextcloud apply
+mise run tf nextcloud output ansible_inventory_line   # into nextcloud/ansible/inventory/hosts.yml
 ```
 
-Host configuration (Nextcloud AIO + Tailscale) is handled afterwards by Ansible
-— see [../../../ansible/README.md](../../../ansible/README.md) and the top-level
-[NEXTCLOUD.md](../../../NEXTCLOUD.md) runbook.
+No `terraform.tfvars` is needed: `.mise/sops-exec terraform` supplies
+`TF_VAR_pm_api_*` from the repo-root `secrets.yaml` for each command.
+`terraform.tfvars.example` documents the non-secret overrides only.
 
+Everything running on the VM is Ansible's job — see
+[../ansible/README.md](../ansible/README.md) and the
+[Nextcloud runbook](../README.md).
+
+<!-- The generated table shows the git:: module source as a bare URL. -->
+<!-- markdownlint-disable MD034 -->
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -31,7 +38,7 @@ No providers.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_nextcloud"></a> [nextcloud](#module\_nextcloud) | ../../modules/base-vm | n/a |
+| <a name="module_nextcloud"></a> [nextcloud](#module\_nextcloud) | git::https://github.com/colac/homelab-proxmox.git//terraform/modules/base-vm | v2.0.0 |
 
 ## Resources
 
@@ -48,7 +55,7 @@ No resources.
 | <a name="input_pm_api_token_id"></a> [pm\_api\_token\_id](#input\_pm\_api\_token\_id) | This is an API token you have previously created for a specific user. | `string` | n/a | yes |
 | <a name="input_pm_api_token_secret"></a> [pm\_api\_token\_secret](#input\_pm\_api\_token\_secret) | This uuid is only available when the token was initially created. | `string` | n/a | yes |
 | <a name="input_pm_api_url"></a> [pm\_api\_url](#input\_pm\_api\_url) | This is the target Proxmox API endpoint. | `string` | n/a | yes |
-| <a name="input_pm_tls_insecure"></a> [pm\_tls\_insecure](#input\_pm\_tls\_insecure) | Skip TLS verification against the Proxmox API. Set via TF\_VAR\_pm\_tls\_insecure from terraform/.envrc (PROXMOX\_TLS\_INSECURE); true is only needed when the endpoint serves a self-signed certificate. | `bool` | `false` | no |
+| <a name="input_pm_tls_insecure"></a> [pm\_tls\_insecure](#input\_pm\_tls\_insecure) | Skip TLS verification against the Proxmox API. Set via TF\_VAR\_pm\_tls\_insecure by .mise/sops-exec (PROXMOX\_TLS\_INSECURE in mise.toml); true is only needed when the endpoint serves a self-signed certificate. | `bool` | `false` | no |
 | <a name="input_proxmox_node"></a> [proxmox\_node](#input\_proxmox\_node) | Proxmox node to deploy the VM on. | `string` | `"pve"` | no |
 | <a name="input_proxmox_pool"></a> [proxmox\_pool](#input\_proxmox\_pool) | Optional Proxmox resource pool. | `string` | `null` | no |
 | <a name="input_proxmox_storage"></a> [proxmox\_storage](#input\_proxmox\_storage) | Proxmox storage pool for the VM disk and cloud-init drive. | `string` | `"local-lvm"` | no |

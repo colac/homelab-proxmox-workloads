@@ -12,6 +12,9 @@
   register: nextcloud_aio_nas_running
   changed_when: false
   failed_when: false
+  # Read-only, so it runs under --check too; skipped, it registers nothing
+  # and the tasks that parse its output fail.
+  check_mode: false
 
 - name: Note when Nextcloud is not running yet
   ansible.builtin.debug:
