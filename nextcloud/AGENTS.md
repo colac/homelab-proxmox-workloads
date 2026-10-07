@@ -1,8 +1,12 @@
-# CLAUDE.md — Nextcloud
+# AGENTS.md — Nextcloud
 
-Loaded when working under `nextcloud/`. The repo-wide rules (secrets,
-toolchain, conventions) are in [../CLAUDE.md](../CLAUDE.md); the runbook is
-[README.md](README.md).
+Agent instructions for `nextcloud/` (Claude Code loads this via `CLAUDE.md`
+when working here). The repo-wide rules — secrets, commands, conventions — are
+in [../AGENTS.md](../AGENTS.md); the runbook is [README.md](README.md).
+
+Commands take the app first: `mise run play nextcloud playbooks/10-nextcloud.yml
+--check --diff`, `mise run tf nextcloud plan` (both need credentials — ask the
+human first).
 
 ## Current design
 
@@ -39,8 +43,8 @@ secrets.yaml nextcloud_domain, acme_email, cloudflare_dns_api_token,
   `ansible/roles/reverse_proxy/defaults/main.yml`.
 - **This app's Cloudflare token is its own.** Kibana's certificate (monitoring
   repo) uses a separate token, so rotating one cannot break the other. Steps:
-  [README.md](README.md#rotating-the-cloudflare-api-token-or-a-cert-failed-to-renew).
-  Never paste the token into a role default or the rendered Caddy `.env`.
+  core's `docs/CREDENTIALS.md` § Cloudflare DNS tokens. Never paste the token
+  into a role default or the rendered Caddy `.env`.
 - **Storage lives on TrueNAS as SMB external storage, never on the VM disk.**
   Each person in `nextcloud_users_json` with `nas_folder: true` gets
   `media/<username>` mounted privately (`applicable_users`) — the phone
@@ -48,9 +52,14 @@ secrets.yaml nextcloud_domain, acme_email, cloudflare_dns_api_token,
   `admin` included: curating it happens over SMB against TrueNAS, where it is
   an instant same-dataset rename instead of the copy-and-delete Nextcloud would
   do across mounts.
-- **Mounts are create-only.** The role never updates or removes an existing
-  mount, so changing a mount's host, scoping or read-only flag means
-  `occ files_external:delete <id> -y` first, then re-run.
+- **Mounts and accounts are create-only.** The role never updates or removes
+  an existing mount or user, so changing a mount's host, scoping or read-only
+  flag means `occ files_external:delete <id> -y` first, then re-run — and a
+  rotated SMB or user password in `secrets.yaml` does not reach existing ones
+  (see CREDENTIALS.md).
+- **Read-only `command` tasks carry `check_mode: false`** so `--check` can
+  evaluate the tasks that parse their output. Keep it on new read-only lookups,
+  never on a task that changes something.
 - **Two passes are normal.** Users and NAS mounts need the Nextcloud container
   running, which only happens after AIO's first-run setup.
 - **No data disk.** The VM predates the split OS/data disk design and stays on

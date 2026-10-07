@@ -1,8 +1,8 @@
 # Homelab Proxmox — Workloads
 
 The **application layer** of the homelab: the VMs that do the actual work,
-one folder per app. Today that is Nextcloud (live) and a k3s VM (provisioned,
-not yet configured).
+one folder per app. Today that is Nextcloud (live) and k3s (a recipe only —
+its VM is not deployed).
 
 One of three repos, each owning one layer:
 
@@ -21,7 +21,7 @@ consumes — is in the core repo's
 | App | Folder | What it is | Status |
 |---|---|---|---|
 | **Nextcloud** | [nextcloud/](nextcloud/README.md) | AIO behind Caddy (Let's Encrypt via Cloudflare DNS-01), TrueNAS SMB storage, Tailscale subnet route for off-LAN reach | Live — [runbook](nextcloud/README.md) |
-| **k3s** | [k3s/](k3s/README.md) | Single-node Kubernetes VM | VM only |
+| **k3s** | [k3s/](k3s/README.md) | Single-node Kubernetes VM | Not deployed — Terraform recipe only |
 
 Each app folder is self-contained, so working on one never needs the other's
 context or credentials:
@@ -29,7 +29,7 @@ context or credentials:
 ```text
 <app>/
   README.md          the app's runbook
-  CLAUDE.md          the app's deliberate decisions (for AI agents and humans)
+  AGENTS.md          the app's decisions for AI agents (+ CLAUDE.md: @AGENTS.md)
   secrets.yaml       the app's own SOPS file — Ansible reads it, Terraform never does
   terraform/         one TFC workspace, base-vm from core at a pinned tag
   ansible/           ansible.cfg, inventory, playbooks, roles, collections
@@ -79,8 +79,8 @@ flowchart LR
 | Contract | Direction | Where it is pinned |
 |---|---|---|
 | Templates `ubuntu-24.04-template` / `ubuntu-26.04-template` | core → here | each `<app>/terraform/variables.tf` `template_name` |
-| `base-vm` module | core → here | each `<app>/terraform/main.tf` `?ref=v2.0.0` |
-| `colac.homelab` collection | core → here | each `<app>/ansible/requirements.yml` `version: v2.0.0` |
+| `base-vm` module | core → here | each `<app>/terraform/main.tf` `?ref=v2.0.1` |
+| `colac.homelab` collection | core → here | each `<app>/ansible/requirements.yml` `version: v2.0.1` |
 | VM addresses, as agent targets | here → monitoring | monitoring's `ansible/inventory/hosts.yml` |
 | Nextcloud serverinfo token (minted on the VM) | here → monitoring | monitoring's `secrets.yaml` |
 | DNS: `nextcloud.<zone>` → the VM | here → PiHole | set by hand in PiHole |
@@ -118,6 +118,9 @@ exports only what its tool reads — so a Terraform run never holds an app
 password, an Ansible run never holds the Proxmox token, and a new app gets its
 own file and profile rather than widening an existing one.
 
+How to issue and rotate every one of these: core's
+[CREDENTIALS.md](https://github.com/colac/homelab-proxmox/blob/main/docs/CREDENTIALS.md).
+
 What stays out of git entirely: the age private key
 (`~/.config/sops/age/keys.txt`), each app's `ansible/inventory/hosts.yml`
 (addresses), `*/ansible/collections/`, any `*.tfvars`, and `mise.local.toml`.
@@ -130,18 +133,13 @@ What stays out of git entirely: the age private key
    `ansible.cfg`, `requirements.yml`, `.ansible-lint` and `00-bootstrap.yml`).
 3. When it gains secrets: `<app>/secrets.yaml.example`, `sops <app>/secrets.yaml`,
    and a profile named after the app in `.mise/sops-exec`.
-4. A `README.md` (runbook) and a `CLAUDE.md` (its deliberate decisions).
+4. A `README.md` (runbook), an `AGENTS.md` (its deliberate decisions) and a
+   `CLAUDE.md` containing just `@AGENTS.md`.
 5. Add the VM to the monitoring repo's `ansible/inventory/hosts.yml` so it
    gets an Elastic Agent.
 
-## Conventions
+## Development
 
-- **Conventional Commits**, enforced by commitlint. Versioning and
-  `CHANGELOG.md` are automated by semantic-release — never hand-edit either.
-- **pre-commit** on every commit: `terraform_docs`, `terraform_fmt`,
-  `markdownlint`, `shellcheck`, commitlint. `mise run lint` runs them all plus
-  ansible-lint for every app.
-- **ansible-lint must pass at the production profile.** Role variables are
-  prefixed with the role name.
-- **Pins are load-bearing:** Terraform `1.15.7`, Telmate/proxmox
-  `3.0.2-rc07`, ansible-core `2.17.14` — the same as the other two repos.
+Tools, tasks, conventions and how to roll out a new core version are shared
+by all three repos: core's [DEVELOPMENT.md](https://github.com/colac/homelab-proxmox/blob/main/docs/DEVELOPMENT.md).
+AI agents: [AGENTS.md](AGENTS.md), plus `<app>/AGENTS.md`.
