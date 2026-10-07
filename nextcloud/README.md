@@ -29,54 +29,24 @@ IP, and the VM advertises the LAN as a **Tailscale subnet route**:
 
 The cert is valid on either path because it matches the hostname, not an IP.
 
-## Files you create
+## Credentials
 
-Three. Credentials are split by who consumes them, each file SOPS-encrypted
-(ciphertext on disk, safe to commit) and decrypted by `.mise/sops-exec` for one
-command at a time — never into your shell. There is no `.tfvars`, no
-`.pkrvars.hcl` and no Ansible vault. See [Secrets](../README.md#secrets).
+Two SOPS files, split by who reads them, each decrypted for one command at a
+time — never into your shell:
 
-| Create this | How | Holds |
+| File | Holds | Read by |
 |---|---|---|
-| `secrets.yaml` (repo root) | `mise run secrets:edit` (keys in `secrets.yaml.example`) | Proxmox endpoint, the Terraform Proxmox token, TFC token — Terraform only |
-| `nextcloud/secrets.yaml` | `mise run secrets:edit nextcloud` (keys in `nextcloud/secrets.yaml.example`) | domain, ACME email, Cloudflare token, TrueNAS SMB user + password, the Nextcloud user list (names **and** passwords), Tailscale key — Ansible only |
-| `nextcloud/ansible/inventory/hosts.yml` | copy `.example` | the VM's IP (from Terraform output) — git-ignored |
+| `secrets.yaml` (repo root) | Proxmox endpoint and Terraform token, Terraform Cloud token | `mise run tf nextcloud …` |
+| `nextcloud/secrets.yaml` | `nextcloud_domain`, `acme_email`, Caddy's Cloudflare token, the TrueNAS SMB account, the Nextcloud accounts, the Tailscale auth key | `mise run play nextcloud …` |
 
-The template (and the Packer token and console password hash that build it)
-is the core repo's; see its [packer/README.md](https://github.com/colac/homelab-proxmox/blob/main/packer/README.md).
+You also need the age key and the SSH deploy key (`~/.ssh/homelab-proxmox`),
+and `nextcloud/ansible/inventory/hosts.yml` with the VM's IP (copy the
+`.example`; git-ignored). How to issue every one of them, in order:
+[CREDENTIALS.md](https://github.com/colac/homelab-proxmox/blob/main/docs/CREDENTIALS.md#issue-order). `mise run secrets:check` names anything
+missing without printing values.
 
-You also need an age key at `~/.config/sops/age/keys.txt` whose public half is a
-recipient in `.sops.yaml`; without it nothing decrypts. `mise run
-secrets:check` tells you which keys are missing without printing any value.
-
-## Keys & passwords you need
-
-| Secret | How to get it | Goes in |
-|---|---|---|
-| age keypair | `age-keygen -o ~/.config/sops/age/keys.txt` | decrypts `secrets.yaml`; public half goes in `.sops.yaml` |
-| Terraform Proxmox token (`terraform@pve`) | `pveum` commands in core's [terraform/README.md](https://github.com/colac/homelab-proxmox/blob/main/terraform/README.md) | `secrets.yaml` → `proxmox_terraform_token_*` |
-| SSH deploy keypair | generated below (`~/.ssh/homelab-proxmox`) | stays in `~/.ssh`; core's Packer reads the public half per build |
-| TrueNAS SMB user + password | create in the TrueNAS UI (see prerequisites) | `nextcloud/secrets.yaml` (the NAS *host* goes in `group_vars`) |
-| Nextcloud user names + passwords | you choose them | `nextcloud/secrets.yaml` → `nextcloud_users_json` |
-| Cloudflare API token | Cloudflare dashboard → My Profile → API Tokens (Zone:DNS:Edit on the `example.com` zone) — this app's own; Kibana's is separate | `nextcloud/secrets.yaml` |
-| Tailscale auth key (optional) | Tailscale admin → Settings → Keys | `nextcloud/secrets.yaml` |
-| Terraform Cloud token | `terraform login` | `~/.terraform.d/`, or `secrets.yaml` → `tf_cloud_token` |
-| AIO passphrase | auto-generated at first run | shown in AIO UI — save it |
-| Nextcloud admin password | you set during AIO setup | Nextcloud login |
-
-## SSH deploy key
-
-A single dedicated keypair is used across all three stages: its public key is
-baked into the template (Packer) and added to the clone (Terraform), and Ansible
-connects with the private key. Generate it once:
-
-```bash
-ssh-keygen -t ed25519 -N "" -C "homelab-proxmox-nextcloud-deploy" \
-  -f ~/.ssh/homelab-proxmox
-```
-
-The example files and `nextcloud/ansible/ansible.cfg` already point at this path
-(`~/.ssh/homelab-proxmox` / `.pub`), so no edits are needed if you keep the name.
+Not in any file, so keep them in a password manager: the AIO passphrase
+(shown once in the AIO UI) and the Nextcloud admin password.
 
 ## 0. One-time prerequisites
 
@@ -97,9 +67,9 @@ These cannot come from this repo — do them once:
 - **Tailscale:** in the admin console enable **MagicDNS**; optionally create an
   **auth key**. (The subnet-route approval and split-DNS entry are done after the
   VM joins — see step 4.)
-- **Cloudflare:** the `example.com` zone is on Cloudflare. Create a scoped API
-  token (**Zone → DNS → Edit**, limited to this zone) for the ACME DNS-01
-  challenge; it goes in `nextcloud/secrets.yaml` as `cloudflare_dns_api_token`.
+- **Cloudflare:** the `example.com` zone is on Cloudflare, with a token for
+  the ACME DNS-01 challenge — see
+  [Cloudflare DNS tokens](https://github.com/colac/homelab-proxmox/blob/main/docs/CREDENTIALS.md#cloudflare-dns-tokens).
 - **PiHole:** add a local DNS A record `nextcloud.example.com → <VM LAN IP>`
   (Local DNS → DNS Records). This is what makes the name resolve on the LAN.
 - **TrueNAS:** Sharing → SMB → enable the service and create the share(s);
@@ -413,35 +383,13 @@ then Manage Configuration → Upload File) and is not part of this pipeline.
 
 ## Troubleshooting
 
-### Rotating the Cloudflare API token (or a cert failed to renew)
+### A certificate failed to renew, or rotating the Cloudflare token
 
-`cloudflare_dns_api_token` in `nextcloud/secrets.yaml` is **Caddy's own**.
-Kibana's certificate uses a separate token in the monitoring repo, so rotating
-this one never touches it (its steps are in that repo's
-[RUNBOOK.md](https://github.com/colac/homelab-proxmox-monitoring/blob/main/RUNBOOK.md#rotating-the-cloudflare-api-token)).
-The token needs `Zone:DNS:Edit` on the zone of `nextcloud_domain`.
-
-```bash
-# 1. Cloudflare dashboard → My Profile → API Tokens → create/roll the token.
-# 2. Put it in place (values are edited via sops, never with a text editor):
-mise run secrets:edit nextcloud   # set cloudflare_dns_api_token
-mise run secrets:check            # confirms it is set, without printing it
-
-# 3. Push it to the host — rewrites Caddy's .env and restarts Caddy
-mise run play nextcloud playbooks/10-nextcloud.yml
-```
-
-Then confirm the cert actually renews rather than assuming:
-`docker logs nextcloud-caddy 2>&1 | tail -50` on the Nextcloud VM. Caddy
-retries ACME on restart, so a new token normally issues within a minute or
-two. Look for `certificate obtained successfully`.
-
-If it still fails, the usual causes are a token scoped to the wrong zone, a
-token with `Zone:Read` but no `DNS:Edit`, or the playbook run outside
-`mise run play` (the `reverse_proxy` role's assert fails the run in that
-case). Expiry dates of the
-old cert are your deadline: Let's Encrypt certs last 90 days and both tools
-start renewing at 30 days remaining.
+Caddy uses its own token from `nextcloud/secrets.yaml`; Kibana's is separate.
+Rotating it and proving the renewal works:
+[Cloudflare DNS tokens](https://github.com/colac/homelab-proxmox/blob/main/docs/CREDENTIALS.md#cloudflare-dns-tokens). The usual causes of a
+failed renewal are a token scoped to the wrong zone, or `Zone:Read` without
+`DNS:Edit` — `docker logs nextcloud-caddy` on the VM says which.
 
 ### An off-LAN device (phone/laptop on Tailscale) can't open the URL
 
@@ -475,7 +423,7 @@ present in the app, ensure it's on.
 | Ansible roles + playbook (+ core's collection) | yes | `nextcloud/ansible/inventory/hosts.yml` |
 | Secrets scheme (SOPS + mise) | yes | age key, values in `secrets.yaml` and `nextcloud/secrets.yaml` |
 | Elastic Agent enrollment | monitoring repo | the VM listed in its `inventory/hosts.yml` |
-| SSH deploy key | command above | run it once |
-| Proxmox users / API tokens | docs only | create per README |
+| SSH deploy key | [CREDENTIALS.md](https://github.com/colac/homelab-proxmox/blob/main/docs/CREDENTIALS.md#ssh-deploy-key) | run it once |
+| Proxmox users / API tokens | [CREDENTIALS.md](https://github.com/colac/homelab-proxmox/blob/main/docs/CREDENTIALS.md#terraform-proxmox-token) | create once |
 | Caddy reverse proxy + Tailscale roles | yes | Cloudflare token, route approval, split-DNS |
 | Tailscale + TrueNAS + PiHole prep | — | enable in their consoles |

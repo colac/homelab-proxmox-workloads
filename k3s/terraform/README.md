@@ -2,8 +2,9 @@
 
 Clones the core repo's template into a VM, using the core repo's `base-vm`
 module pinned to a release tag. State is stored in the Terraform Cloud `k3s`
-workspace of the `colac_homelab` organization (Local execution). Nothing
-configures the VM yet — see [../README.md](../README.md).
+workspace of the `colac_homelab` organization (Local execution). The VM is
+not deployed at the moment and nothing configures it yet — see
+[../README.md](../README.md).
 
 ```bash
 mise run tf k3s init
@@ -29,7 +30,7 @@ No providers.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_base-vm"></a> [base-vm](#module\_base-vm) | git::https://github.com/colac/homelab-proxmox.git//terraform/modules/base-vm | v2.0.0 |
+| <a name="module_base-vm"></a> [base-vm](#module\_base-vm) | git::https://github.com/colac/homelab-proxmox.git//terraform/modules/base-vm | v2.0.1 |
 
 ## Resources
 

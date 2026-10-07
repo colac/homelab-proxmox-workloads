@@ -38,7 +38,7 @@ No providers.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_nextcloud"></a> [nextcloud](#module\_nextcloud) | git::https://github.com/colac/homelab-proxmox.git//terraform/modules/base-vm | v2.0.0 |
+| <a name="module_nextcloud"></a> [nextcloud](#module\_nextcloud) | git::https://github.com/colac/homelab-proxmox.git//terraform/modules/base-vm | v2.0.1 |
 
 ## Resources
 

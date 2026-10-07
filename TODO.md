@@ -1,7 +1,7 @@
 # TODO / Roadmap
 
 The single place this repo's status lives. When something lands, check it off
-here — `README.md` and `CLAUDE.md` point at this file rather than duplicating
+here — `README.md` and `AGENTS.md` point at this file rather than duplicating
 status inline. Template and homelab-wide items are tracked in the core repo's
 `TODO.md`; monitoring in that repo's.
 
@@ -26,7 +26,11 @@ status inline. Template and homelab-wide items are tracked in the core repo's
 
 ## k3s
 
-- [x] VM from the core 26.04 template → TFC workspace `k3s` (24G OS + 12G data)
+- [x] Terraform recipe on the core 26.04 template → TFC workspace `k3s`
+      (24G OS + 12G data)
+- [ ] **Sync the state with reality.** The VM was deleted from Proxmox, but
+      the workspace state may still list it, so plans propose creating it:
+      `mise run tf k3s apply -refresh-only`, or `apply` when it is wanted again
 - [ ] `k3s/ansible/` — nothing configures the VM yet
 - [ ] Add it to the monitoring repo's agent targets once it runs something
 
@@ -36,6 +40,14 @@ status inline. Template and homelab-wide items are tracked in the core repo's
       `git filter-repo`; one folder per app; secrets split into infra (root)
       and per-app files; the shared roles and module come from core at a
       pinned tag; mise replaces the Makefile and direnv
+- [x] **On core v2.0.1, Nextcloud plan clean.** Applied once to move the
+      VM's CPU from the deprecated `cores` into the `cpu { }` block (same 4
+      cores, `host` type — no reboot); `startup_shutdown` drift gone. Plans
+      say "No changes"
+- [x] **Docs:** `AGENTS.md` (+ `nextcloud/AGENTS.md`) imported by one-line
+      `CLAUDE.md` files; credentials and development docs centralised in
+      core's `docs/`; `mise run deps:dev` also points Terraform at the
+      sibling core through a git-ignored `dev_override.tf`
 - [ ] **A dedicated Proxmox token for this repo**
       (`terraform@pve!terraform-workloads`) so revoking the monitoring one
       cannot break this one
