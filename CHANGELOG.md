@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/colac/homelab-proxmox-workloads/compare/v1.1.0...v1.2.0) (2026-10-07)
+
+
+### Features
+
+* **mise:** deps:dev also points Terraform at the sibling core ([2e17d05](https://github.com/colac/homelab-proxmox-workloads/commit/2e17d059df86b4f36ff541e289968a36b383e98c))
+
 # [1.1.0](https://github.com/colac/homelab-proxmox-workloads/compare/v1.0.0...v1.1.0) (2026-10-06)
 
 
