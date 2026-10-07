@@ -6,7 +6,7 @@ collections:
   # release tag. Bump deliberately; run 00-bootstrap.yml with --check after.
   - name: https://github.com/colac/homelab-proxmox.git#/ansible/
     type: git
-    version: v2.0.0
+    version: v2.0.1
   - name: community.docker
     version: ">=3.10.0"
   - name: ansible.posix
