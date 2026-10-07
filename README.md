@@ -57,7 +57,7 @@ flowchart LR
 
   nas[("TrueNAS<br/>SMB: media")]
   cf["Cloudflare DNS<br/>ACME TXT only"]
-  pihole["PiHole<br/>LAN DNS"]
+  pihole["Pi-hole 192.168.1.153<br/>LAN DNS (core repo)"]
   mon["monitoring repo<br/>Fleet Server"]
   you(["you — LAN or tailnet"])
 
@@ -83,7 +83,7 @@ flowchart LR
 | `colac.homelab` collection | core → here | each `<app>/ansible/requirements.yml` `version: v2.0.1` |
 | VM addresses, as agent targets | here → monitoring | monitoring's `ansible/inventory/hosts.yml` |
 | Nextcloud serverinfo token (minted on the VM) | here → monitoring | monitoring's `secrets.yaml` |
-| DNS: `nextcloud.<zone>` → the VM | here → PiHole | set by hand in PiHole |
+| DNS: `nextcloud.<zone>` → the VM | here → core | `pihole_local_records` in core's [`dns/`](https://github.com/colac/homelab-proxmox/blob/main/dns/README.md) — a PR to core |
 
 ## Quick start
 

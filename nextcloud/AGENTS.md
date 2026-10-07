@@ -14,7 +14,8 @@ AIO in reverse-proxy mode (`APACHE_PORT=11000`, localhost-bound), served
 privately at `https://nextcloud.example.com`. TLS is terminated by a **Caddy**
 reverse proxy on the VM using a Let's Encrypt cert via **Cloudflare DNS-01**
 (no public exposure; Cloudflare only answers DNS). Tailscale provides off-LAN
-reach via a `--advertise-routes` subnet route + PiHole split-DNS.
+reach via a `--advertise-routes` subnet route + split-DNS to Pi-hole
+(`192.168.1.153`, run by core's `dns/` — the `nextcloud` A record lives there).
 
 ```text
 terraform/   VM "nextcloud", ubuntu-24.04-template, 4 vCPU / 8 GB / 64 GB, no
@@ -36,7 +37,7 @@ secrets.yaml nextcloud_domain, acme_email, cloudflare_dns_api_token,
   unavoidable one-time manual steps.
 - **The AIO domain is permanent.** Whatever is submitted in the AIO UI cannot
   change later; it must match `nextcloud_domain`, the Caddy vhost and the
-  PiHole record exactly.
+  DNS record in core exactly.
 - **AIO stays on `nextcloud/all-in-one:latest`.** AIO supports only `latest`
   (or `beta`) for the mastercontainer, which pins and updates everything it
   manages. Caddy and its `caddy-dns/cloudflare` plugin *are* pinned, in
