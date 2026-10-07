@@ -70,8 +70,10 @@ These cannot come from this repo — do them once:
 - **Cloudflare:** the `example.com` zone is on Cloudflare, with a token for
   the ACME DNS-01 challenge — see
   [Cloudflare DNS tokens](https://github.com/colac/homelab-proxmox/blob/main/docs/CREDENTIALS.md#cloudflare-dns-tokens).
-- **PiHole:** add a local DNS A record `nextcloud.example.com → <VM LAN IP>`
-  (Local DNS → DNS Records). This is what makes the name resolve on the LAN.
+- **DNS record:** `nextcloud.example.com → <VM LAN IP>` is managed in the core
+  repo (`nextcloud` in `pihole_local_records`, `dns/` — a PR there, then
+  `mise run dns:play playbooks/10-pihole.yml` in core). This is what makes the
+  name resolve on the LAN. See core's [DNS runbook](https://github.com/colac/homelab-proxmox/blob/main/dns/README.md).
 - **TrueNAS:** Sharing → SMB → enable the service and create the share(s);
   Credentials → Users → create a dedicated SMB user (not `root`/`admin`) with
   read/write access to it. See core's [TrueNAS/README.md](https://github.com/colac/homelab-proxmox/blob/main/TrueNAS/README.md).
@@ -123,8 +125,10 @@ reminds you about:
 
 - **Approve the subnet route** `192.168.1.0/24` (Machines → the node → Edit route
   settings) so off-LAN devices can reach the VM.
-- **Add split-DNS** for `example.com` pointing at the PiHole (DNS → Nameservers
-  → Restrict to domain) so tailnet devices resolve the name to the LAN IP.
+- **Add split-DNS** for `example.com` pointing at Pi-hole, `192.168.1.153`
+  (DNS → Nameservers → Restrict to domain), so tailnet devices resolve the name
+  to the LAN IP. Add `192.168.1.53` as well once core's Raspberry Pi resolver
+  exists.
 
 ## 4. Finish Nextcloud setup, then run Ansible again
 
@@ -257,11 +261,11 @@ Three caveats worth knowing:
   (git-ignored) so Packer advertises your LAN IP, not the VPN tunnel, to the VM
   during autoinstall. Confirm the NIC with `ip -br addr`.
 - **DNS:** the configs use `https://pve.example.com:8006/api2/json`, which only
-  resolves through PiHole — keep PiHole as your DNS while deploying. TLS
+  resolves through Pi-hole — keep it as your DNS while deploying. TLS
   verification is on and the Let's Encrypt cert is valid, so it works by name.
 - **The AIO domain is permanent:** whatever you submit in the AIO UI cannot be
   changed later. Type `nextcloud.example.com` exactly — it must match the Caddy
-  vhost and the PiHole record.
+  vhost and the DNS record in core.
 - **Caddy cert on first boot:** Caddy needs the Cloudflare token to solve DNS-01.
   If the cert never issues, check the token scope (Zone:DNS:Edit on this zone)
   with `docker logs nextcloud-caddy`.
@@ -375,9 +379,9 @@ then Manage Configuration → Upload File) and is not part of this pipeline.
 4. Re-run `mise run play nextcloud playbooks/10-nextcloud.yml` to
    recreate users and reattach the TrueNAS mounts. Both tasks are idempotent,
    so it's harmless if the restore already recreated them.
-5. Caddy, Tailscale, PiHole, and Cloudflare need nothing new — the cert is
-   re-issued automatically via DNS-01, and the PiHole record only changes if
-   the VM's IP did. If it did, also update the monitoring repo's
+5. Caddy, Tailscale, Pi-hole, and Cloudflare need nothing new — the cert is
+   re-issued automatically via DNS-01, and the DNS record (core's `dns/`) only
+   changes if the VM's IP did. If it did, also update the monitoring repo's
    `ansible/inventory/hosts.yml` and re-enroll the agent there
    (`mise run play playbooks/20-elastic-certs.yml playbooks/50-elastic-agent.yml --limit nextcloud-vm`).
 
@@ -394,19 +398,20 @@ failed renewal are a token scoped to the wrong zone, or `Zone:Read` without
 ### An off-LAN device (phone/laptop on Tailscale) can't open the URL
 
 Almost always **DNS, not connectivity**. The hostname only exists as a private
-PiHole record, so a remote device has no way to resolve it until Tailscale is
-told to ask PiHole for that domain.
+Pi-hole record, so a remote device has no way to resolve it until Tailscale is
+told to ask Pi-hole for that domain.
 
 1. **Confirm it's DNS.** From the device, browse to the VM's *tailnet* IP
    directly, `https://<vm-tailnet-ip>`. You'll get a certificate warning (the cert
    is for the hostname, not the IP) — but if the page loads past the warning,
    tailnet routing works and only name resolution is missing.
 2. **Add split-DNS** (admin console → **DNS** → Nameservers → Add nameserver →
-   Custom): nameserver = the **PiHole IP**, toggle **Restrict to domain** = your
-   apex domain (`example.com`). This routes only that domain's lookups to PiHole,
+   Custom): nameserver = **`192.168.1.153`** (Pi-hole; it moved off `.53` in
+   October 2026), toggle **Restrict to domain** = your apex domain
+   (`example.com`). This routes only that domain's lookups to Pi-hole,
    over the approved subnet route; everything else on the device is untouched.
-3. **Check the record exists**: PiHole has `nextcloud.example.com → <vm-lan-ip>`
-   (Local DNS → DNS Records).
+3. **Check the record exists**: `dig @192.168.1.153 nextcloud.example.com +short`
+   returns the VM's LAN IP (core's `pihole_local_records`).
 4. **Re-toggle Tailscale** on the device so it picks up the new DNS config.
 
 Prerequisites for the above: the `192.168.1.0/24` route is **Approved** (Machines
@@ -426,4 +431,5 @@ present in the app, ensure it's on.
 | SSH deploy key | [CREDENTIALS.md](https://github.com/colac/homelab-proxmox/blob/main/docs/CREDENTIALS.md#ssh-deploy-key) | run it once |
 | Proxmox users / API tokens | [CREDENTIALS.md](https://github.com/colac/homelab-proxmox/blob/main/docs/CREDENTIALS.md#terraform-proxmox-token) | create once |
 | Caddy reverse proxy + Tailscale roles | yes | Cloudflare token, route approval, split-DNS |
-| Tailscale + TrueNAS + PiHole prep | — | enable in their consoles |
+| Tailscale + TrueNAS prep | — | enable in their consoles |
+| DNS record | core repo (`dns/`) | a PR to `pihole_local_records` |

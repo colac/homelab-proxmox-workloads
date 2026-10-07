@@ -50,7 +50,8 @@ resolves ambiguously when a host and a group share a name.
 - **Tailscale**: MagicDNS enabled; optionally an **auth key** to join
   non-interactively. Route approval and split-DNS come after the first run.
 - **Cloudflare**: a token scoped Zone → DNS → Edit on the zone, for DNS-01.
-- **PiHole**: a local A record for the Nextcloud hostname → the VM's LAN IP.
+- **DNS**: an A record for the Nextcloud hostname → the VM's LAN IP, in core's
+  `pihole_local_records` (`dns/`).
 - **TrueNAS**: SMB enabled, the share created, a dedicated SMB user (not
   `root`/`admin`) with read/write on it.
 
@@ -173,7 +174,7 @@ users** — every account would see and be able to write to it.
   would otherwise fail.
 - Tailscale `serve` is deliberately **not** used — it can't present a
   certificate for a custom domain. Instead the VM advertises the LAN as a
-  subnet route, and PiHole split-DNS lets tailnet devices resolve the real
+  subnet route, and split-DNS to Pi-hole (`192.168.1.153`) lets tailnet devices resolve the real
   hostname to the LAN IP. Cloudflare Tunnel was rejected too (public by
   default, terminates TLS itself, upload cap).
 
