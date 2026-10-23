@@ -30,7 +30,7 @@ No providers.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_base-vm"></a> [base-vm](#module\_base-vm) | git::https://github.com/colac/homelab-proxmox.git//terraform/modules/base-vm | v2.0.1 |
+| <a name="module_base-vm"></a> [base-vm](#module\_base-vm) | git::https://github.com/colac/homelab-proxmox.git//terraform/modules/base-vm | v2.2.2 |
 
 ## Resources
 

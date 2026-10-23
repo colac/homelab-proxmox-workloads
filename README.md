@@ -79,8 +79,8 @@ flowchart LR
 | Contract | Direction | Where it is pinned |
 |---|---|---|
 | Templates `ubuntu-24.04-template` / `ubuntu-26.04-template` | core → here | each `<app>/terraform/variables.tf` `template_name` |
-| `base-vm` module | core → here | each `<app>/terraform/main.tf` `?ref=v2.0.1` |
-| `colac.homelab` collection | core → here | each `<app>/ansible/requirements.yml` `version: v2.0.1` |
+| `base-vm` module | core → here | each `<app>/terraform/main.tf` `?ref=v2.2.2` |
+| `colac.homelab` collection | core → here | each `<app>/ansible/requirements.yml` `version: v2.2.2` |
 | VM addresses, as agent targets | here → monitoring | monitoring's `ansible/inventory/hosts.yml` |
 | Nextcloud serverinfo token (minted on the VM) | here → monitoring | monitoring's `secrets.yaml` |
 | DNS: `nextcloud.<zone>` → the VM | here → core | `pihole_local_records` in core's [`dns/`](https://github.com/colac/homelab-proxmox/blob/main/dns/README.md) — a PR to core |
