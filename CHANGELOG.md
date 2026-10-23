@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/colac/homelab-proxmox-workloads/compare/v1.2.0...v1.3.0) (2026-10-23)
+
+
+### Features
+
+* **nextcloud:** adopt the homelab update procedure ([94a678a](https://github.com/colac/homelab-proxmox-workloads/commit/94a678aa5e4c24d67a0358d840735d215159b9cf))
+
 # [1.2.0](https://github.com/colac/homelab-proxmox-workloads/compare/v1.1.0...v1.2.0) (2026-10-07)
 
 
