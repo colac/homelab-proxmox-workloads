@@ -290,6 +290,22 @@ Three caveats worth knowing:
 
 ## Updating the containers
 
+Start with the update procedure (core's `docs/UPDATES.md`). It reports what the
+VM and every container need, and applies what can be applied safely:
+
+```bash
+mise run update nextcloud                              # report only; changes nothing
+mise run update:apply nextcloud                        # snapshot the VM, then apt + AIO
+mise run update:apply nextcloud -e update_reboot=true  # … and reboot if the kernel changed
+```
+
+`update:apply` snapshots the VM on Proxmox (`preupdate_*`, the last two
+kept), upgrades the OS packages, and runs AIO's update when the report shows
+a newer AIO release. It then waits until Nextcloud reports healthy
+(`occ status`). Copy `ansible/update/proxmox.yml.example` to `proxmox.yml`
+first: the snapshots are taken on the Proxmox node, as root. The procedure only reports Caddy;
+updating it is a pin bump, described below.
+
 Two images, updated two different ways.
 
 **Caddy is pinned in the repo.** `reverse_proxy_caddy_version` and
@@ -310,9 +326,10 @@ sudo docker image prune -f && sudo docker builder prune -f   # old image + Go bu
 **AIO updates itself; the repo stays on `nextcloud/all-in-one:latest`.** AIO
 supports only `latest` (or `beta`) for the mastercontainer, which then pins
 and updates every Nextcloud container it manages. Pinning it in the repo would
-break that. To update, open the AIO interface
-(`ssh -L 8080:localhost:8080 ubuntu@<vm>`, then `https://localhost:8080`):
-if it offers a mastercontainer update, take it first, then
+break that. `mise run update:apply nextcloud` updates it through AIO's own
+script (`nextcloud_aio`'s `tasks/update.yml`). By hand: open the AIO interface
+(`ssh -L 8080:localhost:8080 ubuntu@<vm>`, then `https://localhost:8080`),
+take a mastercontainer update first if one is offered, then
 **Stop containers** → **Start and update containers**. Nextcloud is down for a
 few minutes. Enabling daily backups with automatic updates in the same
 interface makes this unattended.

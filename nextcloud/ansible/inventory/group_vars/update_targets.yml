@@ -1,0 +1,37 @@
+---
+# This app's update procedure — playbook colac.homelab.update (core), run by
+# `mise run update nextcloud`; the rules are core's docs/UPDATES.md. OS
+# packages are always covered; below is everything else on the VM. A running
+# container no component claims is reported as UNTRACKED.
+update_kind: vm
+# The VM's name on Proxmox (terraform/ vm_name): snapshots act on that guest.
+update_proxmox_name: nextcloud
+
+update_checks:
+  - systemd: [docker]
+  - containers: [nextcloud-aio-mastercontainer, nextcloud-aio-apache, nextcloud-aio-nextcloud, nextcloud-caddy]
+  # Nextcloud itself: installed, not in maintenance, no pending DB upgrade.
+  - command_json: [docker, exec, --user, www-data, nextcloud-aio-nextcloud, php, occ, status, --output=json]
+    expect: {installed: true, maintenance: false, needsDbUpgrade: false}
+    report: [versionstring]
+
+update_components:
+  - name: Nextcloud AIO
+    hosts: [nextcloud-vm]
+    # The mastercontainer and every container it manages.
+    containers: "^nextcloud-aio-"
+    version:
+      exec: [nextcloud-aio-mastercontainer, cat, /var/www/docker-aio/php/templates/includes/aio-version.twig]
+    details:
+      - {label: PHP, exec: [nextcloud-aio-nextcloud, php, -r, "echo PHP_VERSION;"]}
+    upstream: {github: nextcloud/all-in-one}
+    apply: "mise run update:apply nextcloud"
+    apply_role: {name: nextcloud_aio, tasks_from: update}
+
+  - name: Caddy (reverse proxy)
+    hosts: [nextcloud-vm]
+    containers: "^nextcloud-caddy$"
+    version: {exec: [nextcloud-caddy, caddy, version], pattern: '^v?(\d[\d.]*)'}
+    upstream: {github: caddyserver/caddy}
+    # Pinned and built on the VM: a deliberate bump, then the app playbook.
+    apply: "bump reverse_proxy_caddy_version, then 10-nextcloud.yml (nextcloud/README.md)"

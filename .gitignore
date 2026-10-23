@@ -32,6 +32,9 @@ ansible.log
 */ansible/collections/
 # Hand-authored inventory — real addresses; keep only the .example.
 */ansible/inventory/hosts.yml
+# Update procedure: its reports, and the Proxmox node's address (`mise run update <app>`).
+*/ansible/reports/
+*/ansible/update/proxmox.yml
 
 # Python
 __pycache__/
