@@ -38,7 +38,10 @@ mise run secrets:check        # every secrets file, missing key names only
 ```
 
 Need credentials — ask the human first: `mise run tf <app> <args>`,
-`mise run play <app> <playbook> [args]`. The app always comes first.
+`mise run play <app> <playbook> [args]`. The app always comes first. No
+credentials, but they reach live machines — ask first too:
+`mise run update <app>`, `mise run update:apply <app>` (the update procedure,
+core's `docs/UPDATES.md`).
 
 ## Rules
 

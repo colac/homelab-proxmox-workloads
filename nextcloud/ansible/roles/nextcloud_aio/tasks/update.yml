@@ -1,0 +1,46 @@
+---
+# AIO's own update — the Nextcloud AIO component's apply_role in this app's
+# update procedure (`mise run update:apply nextcloud`). It uses the script
+# AIO documents for automation (its README: "How to stop/start/update
+# containers … from a script externally"): AUTOMATIC_UPDATES=1 stops the
+# containers, updates the mastercontainer and every image, and starts them
+# again. No AIO backup is taken (DAILY_BACKUP unset); the procedure's Proxmox
+# snapshot is the rollback.
+#
+# The script returns no exit codes, and when it updates the mastercontainer
+# it is killed mid-run; AIO says to run it again afterwards. So: run, wait for
+# the mastercontainer, run again if its version changed. The procedure's
+# health checks decide whether it worked.
+- name: Read the AIO version before
+  ansible.builtin.command: "docker exec nextcloud-aio-mastercontainer cat {{ nextcloud_aio_version_file }}"
+  register: _nextcloud_aio_version_before
+  changed_when: false
+  check_mode: false
+
+- name: Run AIO's update (Nextcloud is down for a few minutes)
+  ansible.builtin.command: docker exec --env AUTOMATIC_UPDATES=1 nextcloud-aio-mastercontainer /daily-backup.sh
+  async: 3600
+  poll: 15
+  failed_when: false
+  changed_when: true
+
+- name: Wait for the mastercontainer
+  ansible.builtin.include_tasks: update_wait.yml
+
+- name: Read the AIO version after
+  ansible.builtin.command: "docker exec nextcloud-aio-mastercontainer cat {{ nextcloud_aio_version_file }}"
+  register: _nextcloud_aio_version_after
+  changed_when: false
+  check_mode: false
+
+- name: Run it again — the mastercontainer updated itself and stopped the first run
+  ansible.builtin.command: docker exec --env AUTOMATIC_UPDATES=1 nextcloud-aio-mastercontainer /daily-backup.sh
+  async: 3600
+  poll: 15
+  failed_when: false
+  changed_when: true
+  when: _nextcloud_aio_version_after.stdout != _nextcloud_aio_version_before.stdout
+
+- name: Wait for the mastercontainer again
+  ansible.builtin.include_tasks: update_wait.yml
+  when: _nextcloud_aio_version_after.stdout != _nextcloud_aio_version_before.stdout

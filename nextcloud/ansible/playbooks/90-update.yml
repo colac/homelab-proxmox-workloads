@@ -1,0 +1,6 @@
+---
+# This app's update procedure: core's shared playbook against this
+# inventory. Run it through `mise run update nextcloud` (report) or
+# `mise run update:apply nextcloud`; see core's docs/UPDATES.md.
+- name: Update procedure (colac.homelab.update)
+  ansible.builtin.import_playbook: colac.homelab.update

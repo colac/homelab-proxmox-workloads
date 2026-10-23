@@ -162,6 +162,20 @@ run = "{{config_root}}/.mise/app play"
 description = "Show an app's inventory (no credentials): mise run inventory <app>"
 run = "{{config_root}}/.mise/app inventory"
 
+# The update procedure (core's colac.homelab.update; core's docs/UPDATES.md).
+# No credentials: SSH keys only. The first argument is the app; everything
+# after it goes to ansible-playbook untouched (-e update_reboot=true,
+# --limit …). mise appends arguments to the run line, and `bash -c '…' update`
+# turns them into "$1" (the app) and "$@" (the rest): no option parsing in
+# between that could swallow a -e.
+[tasks.update]
+description = "Report what an app's VM and containers need; changes nothing: mise run update <app> [ansible-playbook args]"
+run = """bash -c 'cd "{{config_root}}/$1/ansible" && shift && ANSIBLE_CONFIG=$PWD/ansible.cfg exec ansible-playbook -i inventory/ -i update/proxmox.yml playbooks/90-update.yml "$@"' update"""
+
+[tasks."update:apply"]
+description = "Snapshot the app's VM, then apt and its apps' updates: mise run update:apply <app> [-e update_reboot=true]"
+run = """bash -c 'cd "{{config_root}}/$1/ansible" && shift && ANSIBLE_CONFIG=$PWD/ansible.cfg exec ansible-playbook -i inventory/ -i update/proxmox.yml playbooks/90-update.yml -e update_apply=true "$@"' update:apply"""
+
 [tasks.ping]
 description = "SSH reachability of an app's hosts: mise run ping <app>"
 run = "{{config_root}}/.mise/app ping"

@@ -41,3 +41,7 @@ nextcloud_aio_nas_mounts: []
 # Nextcloud treats as 0 — so without this, nothing curated over SMB ever
 # shows up until someone runs `occ files:scan`.
 nextcloud_aio_nas_check_changes: 1
+
+# Where the mastercontainer keeps its version (shown in the AIO interface);
+# the update procedure reads it (tasks/update.yml, group_vars/update_targets.yml).
+nextcloud_aio_version_file: /var/www/docker-aio/php/templates/includes/aio-version.twig

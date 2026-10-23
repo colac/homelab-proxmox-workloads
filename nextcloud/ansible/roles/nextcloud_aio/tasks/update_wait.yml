@@ -1,0 +1,14 @@
+---
+# docker inspect fails while the container is being recreated; the retries
+# carry on until it runs and its healthcheck passes (10 minutes at most).
+- name: Wait until the mastercontainer runs and is healthy
+  ansible.builtin.command: docker inspect nextcloud-aio-mastercontainer
+  register: _nextcloud_aio_master
+  until: >-
+    _nextcloud_aio_master.rc == 0
+    and (_nextcloud_aio_master.stdout | from_json)[0].State.Running
+    and ((_nextcloud_aio_master.stdout | from_json)[0].State.Health | default({})).Status | default('healthy') == 'healthy'
+  retries: 60
+  delay: 10
+  changed_when: false
+  check_mode: false

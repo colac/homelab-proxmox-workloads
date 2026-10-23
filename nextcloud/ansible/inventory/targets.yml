@@ -1,0 +1,9 @@
+---
+# What this app's update procedure covers (`mise run update nextcloud`):
+# nextcloud-vm from hosts.yml. The Proxmox node, where its snapshots are
+# taken, is only in ../update/proxmox.yml, which the update tasks add.
+all:
+  children:
+    update_targets:
+      children:
+        nextcloud: {}
