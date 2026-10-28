@@ -50,6 +50,8 @@ core's `docs/UPDATES.md`).
   `sops decrypt` or `.mise/sops-exec`. Refer to secrets by key name (the
   `*.example` files) and use `mise run secrets:check`. New secret → core's
   `docs/CREDENTIALS.md` § Adding a secret.
+  Never commit with `--no-verify`: the `sops-encrypted` pre-commit hook is
+  what keeps a plaintext secret out of these public repos.
 - **Secrets are split by consumer.** The root `secrets.yaml` holds only what
   Terraform needs; `<app>/secrets.yaml` only that app's Ansible secrets. Never
   put an app secret in the root file or a Proxmox credential in an app file.
