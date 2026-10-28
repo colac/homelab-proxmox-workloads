@@ -80,8 +80,8 @@ flowchart LR
 | Contract | Direction | Where it is pinned |
 |---|---|---|
 | Templates `ubuntu-24.04-template` / `ubuntu-26.04-template` | core → here | each `<app>/terraform/variables.tf` `template_name` |
-| `base-vm` module | core → here | each `<app>/terraform/main.tf` `?ref=v2.2.2` |
-| `colac.homelab` collection | core → here | each `<app>/ansible/requirements.yml` `version: v2.2.2` |
+| `base-vm` module | core → here | each `<app>/terraform/main.tf` `?ref=v2.3.0` |
+| `colac.homelab` collection | core → here | each `<app>/ansible/requirements.yml` `version: v2.3.0` |
 | Update procedure (`colac.homelab.update`): each app's targets, components and checks | core → here | each `<app>/ansible/playbooks/90-update.yml`, `<app>/ansible/inventory/group_vars/update_targets.yml` |
 | The Proxmox node, for pre-update snapshots | core → here | each `<app>/ansible/update/proxmox.yml` (hand-authored, git-ignored) |
 | VM names, as guests covered by an update procedure | here → core | `update_guests_elsewhere` in core's `updates/inventory/group_vars/all.yml` |
