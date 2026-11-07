@@ -10,7 +10,7 @@ reverse_proxy_dir: /opt/nextcloud-caddy
 # Bumping either value changes the rendered Dockerfile, which triggers the
 # rebuild. Keep the builder and runtime on the same version (one variable).
 # Tags: hub.docker.com/_/caddy and github.com/caddy-dns/cloudflare/tags.
-reverse_proxy_caddy_version: "2.11.4"
+reverse_proxy_caddy_version: "2.11.9"
 reverse_proxy_caddy_dns_cloudflare_version: "v0.2.4"
 
 # Upstream: AIO's Apache container (reverse-proxy mode, localhost-bound).
