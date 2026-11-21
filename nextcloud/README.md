@@ -127,8 +127,14 @@ reminds you about:
   settings) so off-LAN devices can reach the VM.
 - **Add split-DNS** for `example.com` pointing at Pi-hole, `192.168.1.153`
   (DNS → Nameservers → Restrict to domain), so tailnet devices resolve the name
-  to the LAN IP. Add `192.168.1.53` as well once core's Raspberry Pi resolver
-  exists.
+  to the LAN IP. Add `192.168.1.53` as well: core's Raspberry Pi resolver
+  (live since 2026-11-18, the primary).
+
+Then, once the AI agent's keys exist on the laptop (`mise run agent install`
+in homelab-proxmox-monitoring), its limited account on this VM:
+`mise run play nextcloud playbooks/05-agent-access.yml` (core's
+`colac.homelab.agent_access`; the containers it may restart are
+`agent_access_restart_containers` in `group_vars/nextcloud.yml`).
 
 ## 4. Finish Nextcloud setup, then run Ansible again
 

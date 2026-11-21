@@ -115,3 +115,15 @@ nextcloud_aio_nas_mounts:
 # nas_folder (optional; true also attaches a private folder from
 # nextcloud_aio_nas_personal_share above). See nextcloud/secrets.yaml.example.
 nextcloud_aio_users: "{{ lookup('env', 'NEXTCLOUD_USERS_JSON') | default('[]', true) | from_json }}"
+
+# ---------------------------------------------------------------------------
+# The AI agent's limited account (playbooks/05-agent-access.yml,
+# colac.homelab.agent_access). Read tier always; the act tier stays off
+# until the approval flow exists (monitoring's docs/ai-ops/architecture.md).
+# Restarts only of these, at most once per target per 6 hours. Not listed on
+# purpose: the AIO database and mastercontainer (restarted by hand), and
+# tailscaled (the way in from outside).
+# ---------------------------------------------------------------------------
+agent_access_restart_units: [elastic-agent]
+agent_access_restart_containers: [nextcloud-caddy, nextcloud-aio-apache, nextcloud-aio-nextcloud, nextcloud-aio-redis]
+agent_access_free_disk: [journal, apt, docker-images]

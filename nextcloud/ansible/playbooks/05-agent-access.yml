@@ -1,0 +1,14 @@
+---
+# The AI agent's limited account on the Nextcloud VM
+# (colac.homelab.agent_access, core v2.6.0 or later; until that tag exists,
+# `mise run deps:dev`). Needs the agent's keys on the laptop first: `mise run
+# agent install` in homelab-proxmox-monitoring. Not in site.yml: it depends on
+# that laptop step.
+#
+#   mise run play nextcloud playbooks/05-agent-access.yml --check --diff
+- name: AI agent account
+  hosts: nextcloud
+  become: true
+  gather_facts: false
+  roles:
+    - colac.homelab.agent_access
