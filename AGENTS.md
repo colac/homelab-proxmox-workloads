@@ -15,7 +15,7 @@ with no VM deployed). Siblings in `~/git-repos/`:
 - `homelab-proxmox-monitoring` — the Elastic Stack, and the Elastic Agent on
   every VM, this repo's included
 
-Template, module, or `common`/`docker_data` changes belong in core — propose
+Template, module, or `colac.homelab` role changes belong in core — propose
 them there, then bump the pin here. Anything about a VM's Elastic Agent belongs
 in monitoring.
 
@@ -59,6 +59,11 @@ core's `docs/UPDATES.md`).
   commit only when asked; the human pushes.
 - **Ansible:** ansible-lint stays green at the production profile; role
   variables and `register:` names carry the role prefix.
+- **Hosts: only through the AI account.** Diagnostics on a machine go
+  through `mise run hostctl <host> <verb>` in monitoring (core's
+  `colac.homelab.agent_access`: fixed read verbs, no shell). `ssh`, `scp`,
+  `rsync`, `ansible` and every play or apply are denied to Claude in the
+  settings; the deploy key is the human's.
 
 ## Deliberate decisions — do not "fix"
 

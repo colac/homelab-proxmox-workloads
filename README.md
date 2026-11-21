@@ -43,7 +43,7 @@ flowchart LR
   subgraph core["core repo (pinned tags)"]
     tpl["Packer templates<br/>ubuntu-24.04 · ubuntu-26.04"]
     mod["base-vm module"]
-    col["colac.homelab<br/>common · docker_data"]
+    col["colac.homelab<br/>common · docker_data · agent_access · update"]
   end
 
   subgraph nc["nextcloud/ — VM nextcloud"]
